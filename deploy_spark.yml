@@ -1,0 +1,45 @@
+# Ansible playbook to deploy Airflow on a EKS cluster.
+---
+- name: "Create the k8s resources for Spark"
+  vars:
+    kubeconfig_file: "kubeconfig"
+    aws_region: us-east-1
+    eks_cluster: spark_k8s_cluster
+    manifests_folder: "manifests"
+  hosts: localhost
+  become: no
+  tasks:
+
+    - name: "Get the kubeconfig file"
+      shell:
+        cmd: |
+          aws eks update-kubeconfig \
+          --region "{{ aws_region }}" \
+          --name "{{eks_cluster}}" \
+          --kubeconfig "{{ kubeconfig_file }}"
+
+    - name: "Create the namespace for the Spark deployment"
+      k8s:
+        kubeconfig: "{{ kubeconfig_file }}"
+        apply: yes
+        state: present
+        src: "{{ manifests_folder }}/spark-ns.yml"
+
+    - name: "Create a Service Account for Spark"
+      k8s:
+        kubeconfig: "{{ kubeconfig_file }}"
+        apply: yes
+        state: present
+        src: "{{ manifests_folder }}/spark-sa.yml"
+
+    - name: "Bind the ClusterRole to the Service Account"
+      k8s:
+        kubeconfig: "{{ kubeconfig_file }}"
+        apply: yes
+        state: present
+        src: "{{ manifests_folder }}/spark-clusterrolebinding.yml"
+
+    - name: "Delete the provisional kubeconfig file"
+      file:
+        path: "{{ kubeconfig_file }}"
+        state: absent
